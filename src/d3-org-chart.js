@@ -1259,33 +1259,40 @@ export class OrgChart {
             .transition()
             .duration(attrs.duration)
             .attr("d", (d) => {
-                const xs = attrs.layoutBindings[attrs.layout].linkX({
+                const layout = attrs.layoutBindings[attrs.layout];
+                const sourceNode = {
                     x: d._source.x,
                     y: d._source.y,
                     width: d._source.width,
                     height: d._source.height,
-                });
-                const ys = attrs.layoutBindings[attrs.layout].linkY({
-                    x: d._source.x,
-                    y: d._source.y,
-                    width: d._source.width,
-                    height: d._source.height,
-                });
-                const xt = attrs.layoutBindings[attrs.layout].linkJoinX({
+                };
+                const targetNode = {
                     x: d._target.x,
                     y: d._target.y,
                     width: d._target.width,
                     height: d._target.height,
-                });
-                const yt = attrs.layoutBindings[attrs.layout].linkJoinY({
-                    x: d._target.x,
-                    y: d._target.y,
-                    width: d._target.width,
-                    height: d._target.height,
-                });
+                };
+
+                const xtls =
+                    layout.linkX(sourceNode) + layout.nodeLeftX(sourceNode);
+                const ytls =
+                    layout.linkY(sourceNode) + layout.nodeTopY(sourceNode);
+                const xtlt =
+                    layout.linkX(targetNode) + layout.nodeLeftX(targetNode);
+                const ytlt =
+                    layout.linkY(targetNode) + layout.nodeTopY(targetNode);
+
+                const edges = this.getClosestEdges(
+                    xtls,
+                    ytls,
+                    xtlt,
+                    ytlt,
+                    d._source.width,
+                    d._source.height,
+                );
                 return attrs.linkGroupArc({
-                    source: { x: xs, y: ys },
-                    target: { x: xt, y: yt },
+                    source: { x: edges[0].x, y: edges[0].y },
+                    target: { x: edges[1].x, y: edges[1].y },
                 });
             });
 
@@ -1614,6 +1621,66 @@ export class OrgChart {
                 nodes: centeredNodes,
             });
         }
+    }
+
+    getClosestEdges(
+        sourceTopLeftX,
+        sourceTopLeftY,
+        targetTopLeftX,
+        targetTopLeftY,
+        width,
+        height,
+    ) {
+        // Calculate center points of source and target nodes
+        const sourceCenterX = sourceTopLeftX + width / 2;
+        const sourceCenterY = sourceTopLeftY + height / 2;
+        const targetCenterX = targetTopLeftX + width / 2;
+        const targetCenterY = targetTopLeftY + height / 2;
+
+        // Calculate horizontal and vertical distances
+        const dx = targetCenterX - sourceCenterX;
+        const dy = targetCenterY - sourceCenterY;
+
+        // Determine the quadrant based on relative positions
+        let sourceEdgeX, sourceEdgeY, targetEdgeX, targetEdgeY;
+
+        // If target is mostly below the source
+        if (dy > Math.abs(dx)) {
+            sourceEdgeX = sourceCenterX;
+            sourceEdgeY = sourceTopLeftY + height; // Middle of bottom edge
+
+            targetEdgeX = targetCenterX;
+            targetEdgeY = targetTopLeftY; // Middle of top edge
+        }
+        // If target is mostly above the source
+        else if (dy < -Math.abs(dx)) {
+            sourceEdgeX = sourceCenterX;
+            sourceEdgeY = sourceTopLeftY; // Middle of top edge
+
+            targetEdgeX = targetCenterX;
+            targetEdgeY = sourceTopLeftY + height; // Middle of bottom edge
+        }
+        // If target is mostly to the right of the source
+        else if (dx > Math.abs(dy)) {
+            sourceEdgeX = sourceTopLeftX + width; // Middle of right edge
+            sourceEdgeY = sourceCenterY;
+
+            targetEdgeX = targetTopLeftX;
+            targetEdgeY = targetCenterY;
+        }
+        // If target is mostly to the left of the source
+        else {
+            sourceEdgeX = sourceTopLeftX; // Middle of left edge
+            sourceEdgeY = sourceCenterY;
+
+            targetEdgeX = targetTopLeftX + width;
+            targetEdgeY = targetCenterY;
+        }
+
+        return [
+            { x: sourceEdgeX, y: sourceEdgeY },
+            { x: targetEdgeX, y: targetEdgeY },
+        ];
     }
 
     // This function detects whether current browser is edge
